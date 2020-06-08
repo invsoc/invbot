@@ -1,10 +1,29 @@
 const Discord = require('discord.js')
 const client = new Discord.Client()
 const nodemailer = require("nodemailer")
+
+const express = require('express')
+const app = express()
+const port = process.env.PORT || 3000
+const url = process.env.URL || "https://invsoc.herokuapp.com"
+
 var sqlite3 = require('sqlite3').verbose()
 var db = new sqlite3.Database('./bot.db')
 
 const secureData = require('./token.json')
+
+app.get('/', (req, res) => res.send('tryna be a haxor lmao get a life!'))
+
+app.get('/verify/:id', (req, res) => {
+  const id = req.params.id
+
+})
+
+app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`))
+
+//
+// DISCORD
+//
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
@@ -12,7 +31,7 @@ client.on('ready', () => {
   //create db
   db.serialize(() => {
     db.each("SELECT name FROM sqlite_master WHERE type='table' AND name='verification';", (err, row) => {
-        if (!row) db.run('CREATE TABLE verification(user_id code)')
+        if (!row) db.run('CREATE TABLE verification(id code)')
         else console.log("Table exists.")
     })
   })
@@ -46,8 +65,11 @@ client.on('message', async msg => {
               pass: secureData.pass, // generated ethereal password
             }
           })
+          
+          let link = `https://invsoc.herokuapp.com/verify/`
+          let code = 1
 
-          let link = "https://sauravyash.com"
+          db.run(`INSERT INTO artists (id, code) VALUES('${author.id}', '${code}')`)
           
           let info = await transporter.sendMail({
             from: `UNSW Investment Society`, // sender address
