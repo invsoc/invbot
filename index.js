@@ -8,25 +8,28 @@ const port = process.env.PORT || 3000
 const url = process.env.URL || "https://invsoc.herokuapp.com"
 
 const sqlite3 = require('sqlite3').verbose()
-const db = new sqlite3.Database('./bot.db')
 const sha1 = require('sha1')
 const { v4: uuidv4 } = require('uuid');
 
 const secureData = require('./token.json')
+const DB_LOCATION = './bot.db'
 
 app.get('/', (req, res) => res.send('tryna be a haxor lmao get a life!'))
 
 app.get('/verify/:code', (req, res) => {
   const code = req.params.code
   let id, guild
-  db.each(`SELECT * FROM verification WHERE 'code'='${code}'`, (err, row) => {
-    id = row.id
-    guild = row.guild
+  const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
+  db.serialize(() => {
+    db.each(`SELECT * FROM verification WHERE 'code'='${code}'`, (err, row) => {
+      id = row.id
+      guild = row.guild
+    })
   })
-  
+  db.close()
   if (!id) res.send("Invalid ID!")
 
-  const guildObj = client.guilds?.cache.find(g => g.id === guild)
+  const guildObj = client.guilds?.cache.first()
   const member = guildObj?.members?.cache.find(m => m.id === id)
   const verifiedRole = guildObj?.roles?.cache?.find(id => id.name === "Verified") || {
     id: "719161072640196648",
@@ -48,27 +51,25 @@ client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
 
   //create db
+  const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
   db.serialize(() => {
-    db.each("SELECT name FROM sqlite_master WHERE type='table' AND name='verification';", (err, row) => {
-        if (!row) db.run('CREATE TABLE verification(id code guild)')
-        else console.log("Table exists.")
-    })
+    db.run('CREATE TABLE IF NOT EXISTS verification(id PRIMARY KEY, code, guild)')
+    console.log("added db table")
   })
    
   db.close()
 })
 
 client.on('message', async msg => {
-  // find verified role
-  const verifiedRole = msg.guild?.roles?.cache?.find(id => id.name === "Verified") || {
-    id: "719161072640196648",
-    name: "Verified"
-  }
-
-  const author = msg.guild?.members?.cache?.find(mem => mem.id === msg.author.id)
-
   // Responses to DMs
   if (msg.channel.type === 'dm') {
+    const guildObj = client.guilds?.cache.first()
+    const verifiedRole = guildObj?.roles?.cache?.find(id => id.name === "Verified") || {
+      id: "719161072640196648",
+      name: "Verified"
+    }
+  
+    const author = msg.author
 
     // verifying UNSW id validity
     const zID = RegExp('((z)([0-9]{6}))')
@@ -87,7 +88,12 @@ client.on('message', async msg => {
           
           let code = sha1(author.id + uuidv4())
 
-          db.run(`INSERT INTO artists (id, code, guild) VALUES('${author.id}', '${code}', '${msg.guild.id}')`)
+          const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
+          db.serialize(() => {
+            db.run(`INSERT INTO verification (id, code, guild) VALUES('${author.id}', '${code}', '${guildObj.id}')`)
+          })
+          db.close()
+
           let link = `https://invsoc.herokuapp.com/verify/${code}`
 
           let info = await transporter.sendMail({
@@ -107,6 +113,13 @@ client.on('message', async msg => {
     }
     // non-DM msgs
   } else {
+    const verifiedRole = msg.guild?.roles?.cache?.find(id => id.name === "Verified") || {
+      id: "719161072640196648",
+      name: "Verified"
+    }
+  
+    const author = msg.guild?.members?.cache?.find(mem => mem.id === msg.author.id)
+
     if (msg.content === '!verify') {
       try {
         if (!author._roles.includes(verifiedRole.id)) {
