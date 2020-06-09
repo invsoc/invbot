@@ -24,7 +24,7 @@ const DB_LOCATION = './bot.db'
 
 app.get('/', (req, res) => res.send('You must be a wannabe hacker hahaha'))
 
-app.get('/verify/:code', (req, res) => {
+app.get('/verify/:code', async (req, res) => {
   const code = req.params.code
   console.log("Verifying:", code)
 
@@ -34,8 +34,8 @@ app.get('/verify/:code', (req, res) => {
   let foundUser = false
 
   const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
-  db.serialize(async () => {
-    db.each(`SELECT * FROM verification WHERE code='${code}'`, (err, row) => {
+  await db.serialize(async () => {
+    await db.each(`SELECT * FROM verification WHERE code='${code}'`, async (err, row) => {
       console.log(row, err)
       if (!!row) {
         foundUser = true
@@ -43,12 +43,13 @@ app.get('/verify/:code', (req, res) => {
         
         member.roles.add(verifiedRole.id)
         member.send("You have been successfully verified!")
-        res.send("Successfully verified!")
+        await res.send("Successfully verified!")
+      }
+      if (!!err) {
+        console.error(err)
+        res.send("Error: Invalid ID!")
       }
     })
-    if (!foundUser) {
-      res.send("Invalid ID!")
-    }
   })
   db.close()
 })
@@ -81,7 +82,7 @@ client.on('message', async msg => {
   // Responses to DMs
   if (msg.channel.type === 'dm') {
     try {
-      console.log(client.guilds);
+      //console.log(client.guilds.cache);
       
       const guildObj = client.guilds.cache.find(g => g.id === secureData.guildID)
       if (!guildObj) throw new Error("Bad fetch: guild not found")
