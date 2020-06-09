@@ -154,4 +154,12 @@ client.on('message', async msg => {
   }
 })
 
+client.on('guildMemberAdd', member => {
+  try {
+    member.send(`Hello there!\nIn order to verify this account, please type your zID (zXXXXXXX)!`)
+  } catch (e) {
+    console.error(e)
+  }
+})
+
 client.login(secureData.token)
