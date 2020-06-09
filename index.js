@@ -81,7 +81,10 @@ client.on('message', async msg => {
   // Responses to DMs
   if (msg.channel.type === 'dm') {
     try {
+      console.log(client.guilds);
+      
       const guildObj = client.guilds.cache.find(g => g.id === secureData.guildID)
+      if (!guildObj) throw new Error("Bad fetch: guild not found")
       const verifiedRole = guildObj.roles.cache.find(id => id.name === "Verified")
       const author = guildObj.members.cache.find(m => m.id === msg.author.id)
 
