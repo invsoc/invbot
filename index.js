@@ -11,7 +11,13 @@ const sqlite3 = require('sqlite3').verbose()
 const sha1 = require('sha1')
 const { v4: uuidv4 } = require('uuid');
 
-const secureData = require('./token.json')
+const secureData = require('./token.json') || {
+  "token": process.env.token,
+  "user": process.env.user,
+  "pass": process.env.pass,
+  "host": process.env.host,
+  "port": process.env.smtp_port
+}
 const DB_LOCATION = './bot.db'
 
 app.get('/', (req, res) => res.send('tryna be a haxor lmao get a life!'))
