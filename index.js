@@ -9,9 +9,10 @@ const url = process.env.URL || "https://invsoc.herokuapp.com"
 
 const sqlite3 = require('sqlite3').verbose()
 const sha1 = require('sha1')
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid')
 
-const secureData = require('./token.json') || {
+const fs = require('fs')
+const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
   "token": process.env.token,
   "user": process.env.user,
   "pass": process.env.pass,
