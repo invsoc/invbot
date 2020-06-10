@@ -4,16 +4,17 @@
   "description": "bot for discord",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "bot": "node index.js",
+    "web": "node server.js"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
     "discord.js": "^12.2.0",
     "express": "^4.17.1",
+    "mysql": "^2.18.1",
     "nodemailer": "^6.4.8",
     "sha1": "^1.1.1",
-    "sqlite3": "^4.2.0",
     "uuid": "^8.1.0"
   },
   "engines": {

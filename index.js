@@ -2,12 +2,9 @@ const Discord = require('discord.js')
 const client = new Discord.Client()
 const nodemailer = require("nodemailer")
 
-const express = require('express')
-const app = express()
-const port = process.env.PORT || 3000
 const url = process.env.URL || "https://invsoc.herokuapp.com"
 
-const sqlite3 = require('sqlite3').verbose()
+const mysql = require('mysql')
 const sha1 = require('sha1')
 const { v4: uuidv4 } = require('uuid')
 
@@ -20,59 +17,31 @@ const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
   "port": process.env.smtp_port,
   "guildID": process.env.guildID
 }
-const DB_LOCATION = './bot.db'
 
-app.get('/', (req, res) => res.send('You must be a wannabe hacker hahaha'))
-
-app.get('/verify/:code', async (req, res) => {
-  const code = req.params.code
-  console.log("Verifying:", code)
-
-  const guildObj = client.guilds.cache.find(g => g.id === secureData.guildID)
-  const verifiedRole = guildObj.roles.cache.find(id => id.name === "Verified")
-
-  let foundUser = false
-
-  const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
-  await db.serialize(async () => {
-    await db.each(`SELECT * FROM verification WHERE code='${code}'`, async (err, row) => {
-      console.log(row, err)
-      if (!!row) {
-        foundUser = true
-        const member = guildObj.members.cache.find(m => m.id === row.user)
-        
-        member.roles.add(verifiedRole.id)
-        member.send("You have been successfully verified!")
-        await res.send("Successfully verified!")
-      }
-      if (!!err) {
-        console.error(err)
-        res.send("Error: Invalid ID!")
-      }
-    })
+let queryDB = (query) => new Promise((resolve, reject) => {
+  const connection = mysql.createConnection(process.env.CLEARDB_DATABASE_URL || {
+    host: secureData.DBhost,
+    user: secureData.DBuser,
+    password: secureData.DBpassword,
+    database: secureData.DBdatabase
   })
-  db.close()
-})
 
-app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`))
+  connection.connect()
+  connection.query(query, (error, results, fields) => {
+    if (error) reject(error)
+    else resolve({results, fields})
+  })
+  connection.end()
+})
 
 //
 // DISCORD
 //
-
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`)
 
   //create db
-  //fs.writeFile(DB_LOCATION, '', function(){console.log('Cleared the DB!')})
-
-  const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
-  db.serialize(() => {
-    db.run('CREATE TABLE IF NOT EXISTS verification(user PRIMARY KEY, code, guild)')
-    console.log("added db table")
-  })
-   
-  db.close()
+  let res = queryDB('CREATE TABLE IF NOT EXISTS verification(user varchar(100), code varchar(100), guild varchar(100))')
 })
 
 client.on('message', async msg => {
@@ -82,8 +51,6 @@ client.on('message', async msg => {
   // Responses to DMs
   if (msg.channel.type === 'dm') {
     try {
-      //console.log(client.guilds.cache);
-      
       const guildObj = client.guilds.cache.find(g => g.id === secureData.guildID)
       if (!guildObj) throw new Error("Bad fetch: guild not found")
       const verifiedRole = guildObj.roles.cache.find(id => id.name === "Verified")
@@ -105,25 +72,25 @@ client.on('message', async msg => {
             })
             
             let code = sha1(author.id + uuidv4())
+            try {
+              await queryDB(`DELETE FROM verification WHERE user='${author.id}'`)
+              await queryDB(`INSERT INTO verification (user, code, guild) VALUES('${author.id}', '${code}', '${guildObj.id}')`)  
 
-            const db = new sqlite3.Database(DB_LOCATION, sqlite3.OPEN_READWRITE)
-            db.serialize(() => {
-              db.run(`DELETE FROM verification WHERE user='${author.id}'`)
-              db.run(`INSERT INTO verification (user, code, guild) VALUES('${author.id}', '${code}', '${guildObj.id}')`)
-            })
-            db.close()
+              let link = `${url}/verify/${code}`
 
-            let link = `${url}/verify/${code}`
+              let info = await transporter.sendMail({
+                from: `UNSW Investment Society`, // sender address
+                to: `${msg.content}@ad.unsw.edu.au`, // list of receivers
+                subject: "InvSoc Discord Verification", // Subject line
+                text: `Hello, please verify your account with this link: ${link}`, // plain text body
+                html: `<b>Verify your discord account <a href="${link}">here</a></b>`, // html body
+              })
 
-            let info = await transporter.sendMail({
-              from: `UNSW Investment Society`, // sender address
-              to: `${msg.content}@ad.unsw.edu.au`, // list of receivers
-              subject: "InvSoc Discord Verification", // Subject line
-              text: `Hello, please verify your account with this link: ${link}`, // plain text body
-              html: `<b>Verify your discord account <a href="${link}">here</a></b>`, // html body
-            })
-
-            msg.author.send(`Thanks! You should have a verification link in your UNSW email!`)
+              msg.author.send(`Thanks! You should have a verification link in your UNSW email!`)
+            } catch (error) {
+              console.error(error)
+              msg.author.send(`Sorry, but there's an error :( Please ping @admin on the server for help!`)
+            }
           } catch (error) {
             console.error(error)
           }
