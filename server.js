@@ -17,23 +17,21 @@ const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
   "guildID": process.env.guildID
 }
 
-const connection = mysql.createConnection(process.env.CLEARDB_DATABASE_URL || {
+const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
   host: secureData.DBhost,
   user: secureData.DBuser,
   password: secureData.DBpassword,
   database: secureData.DBdatabase
 })
 
-client.on('ready', () => {
-  let queryDB = (query) => new Promise((resolve, reject) => {
-    connection.connect()
-    connection.query(query, function (error, results, fields) {
-      if (error) reject(error)
-      else resolve({results, fields})
-    })
-    connection.end()
+let queryDB = (query) => new Promise((resolve, reject) => {
+  connection.query(query, (error, results, fields) => {
+    if (error) reject(error)
+    else resolve({results, fields})
   })
-  
+})
+
+client.on('ready', () => {
   app.get('/', (req, res) => res.send('You must be a wannabe hacker hahaha'))
   
   app.get('/verify/:code', async (req, res) => {
