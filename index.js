@@ -2,7 +2,7 @@ const Discord = require('discord.js')
 const client = new Discord.Client()
 const nodemailer = require("nodemailer")
 
-const url = process.env.URL || "https://invsoc.herokuapp.com"
+const url = process.env.URL
 
 const mysql = require('mysql')
 const sha1 = require('sha1')
