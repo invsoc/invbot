@@ -2,7 +2,7 @@ const Discord = require('discord.js')
 const client = new Discord.Client()
 const nodemailer = require("nodemailer")
 
-const url = process.env.URL || "45.76.126.228"
+const url = process.env.URL || "localhost:80"
 
 const mysql = require('mysql')
 const sha1 = require('sha1')
