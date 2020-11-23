@@ -4,8 +4,7 @@
   "description": "bot for discord",
   "main": "index.js",
   "scripts": {
-    "bot": "node index.js",
-    "web": "node server.js"
+    "start": "node index.js"
   },
   "author": "",
   "license": "MIT",
