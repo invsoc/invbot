@@ -1,7 +1,7 @@
 # UNSW Investment Society Discord Bot
 
 ## Uses
- - verify if uni student
+ - Verify if discord user is a real uni student through official email
 
 ## Running the instance
 ### Node.JS
