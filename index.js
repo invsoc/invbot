@@ -23,7 +23,7 @@ const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
 }
 
 secureData.port = process.env.PORT || 80
-secureData.url = secureData.url || `localhost`
+secureData.url = secureData.URL || `localhost`
 
 const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
   host: secureData.DBhost,
