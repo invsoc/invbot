@@ -1,55 +1,29 @@
 const Discord = require('discord.js')
-const client = new Discord.Client()
 const nodemailer = require("nodemailer")
-
-const url = process.env.URL || "localhost:80"
-
 const mysql = require('mysql')
+const fs = require('fs')
+const express = require('express')
 const sha1 = require('sha1')
 const { v4: uuidv4 } = require('uuid')
+const {google} = require('googleapis')
 
-const fs = require('fs')
-const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
-  "token": process.env.token,
-  "user": process.env.user,
-  "pass": process.env.pass,
-  "host": process.env.host,
-  "port": process.env.smtp_port,
-  "guildID": process.env.guildID
-}
-
-const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
-  host: secureData.DBhost,
-  user: secureData.DBuser,
-  password: secureData.DBpassword,
-  database: secureData.DBdatabase
-})
-
-let queryDB = (query) => new Promise((resolve, reject) => {
-  connection.query(query, (error, results, fields) => {
-    if (error) reject(error)
-    else resolve({results, fields})
-  })
-})
-
-const Discord = require('discord.js')
+const app = express()
 const client = new Discord.Client()
 
-const express = require('express')
-const app = express()
-const port = process.env.PORT || 5000
-
-const mysql = require('mysql')
-
-const fs = require('fs')
 const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
   "token": process.env.token,
+  "guildID": process.env.guildID,
   "user": process.env.user,
-  "pass": process.env.pass,
-  "host": process.env.host,
-  "port": process.env.smtp_port,
-  "guildID": process.env.guildID
+  "port": process.env.port,
+  "clientId": process.env.clientId,
+  "clientSecret": process.env.clientSecret,
+  "accessToken": process.env.accessToken,
+  "refreshToken": process.env.refreshToken,
+  "url": process.env.URL,
 }
+
+secureData.port = process.env.PORT || 80
+secureData.url = secureData.url || `localhost`
 
 const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
   host: secureData.DBhost,
@@ -57,6 +31,56 @@ const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
   password: secureData.DBpassword,
   database: secureData.DBdatabase
 })
+
+// https://stackoverflow.com/questions/45653149/receive-mail-with-nodemailer-without-setting-allow-less-secure-apps-to-access
+let MAIL_AUTH = {
+  service: "Gmail",
+  auth: {
+    type: "OAuth2",
+    user: secureData.user,
+    clientId: secureData.clientId,
+    clientSecret: secureData.clientSecret,
+    accessToken: secureData.accessToken,
+    refreshToken: secureData.refreshToken
+  }
+}
+
+const getGmailAccess = () => {
+  const oauth2Client = new google.auth.OAuth2(
+    secureData.clientId,
+    secureData.clientSecret,
+    "https://sauravyash.com"
+  );
+  
+  const SCOPE = [
+    'https://www.googleapis.com/auth/gmail.compose'
+  ]
+  
+  // const authUrl = 
+  oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPE,
+    prompt: 'consent'
+  })
+
+  oauth2Client.setCredentials({
+    refresh_token: secureData.refreshToken
+  })
+
+  secureData.accessToken = oauth2Client.getAccessToken()
+
+  MAIL_AUTH = {
+    service: "Gmail",
+    auth: {
+      type: "OAuth2",
+      user: secureData.user,
+      clientId: secureData.clientId,
+      clientSecret: secureData.clientSecret,
+      accessToken: secureData.accessToken,
+      refreshToken: secureData.refreshToken
+    }
+  }
+}
 
 let queryDB = (query) => new Promise((resolve, reject) => {
   connection.query(query, (error, results, fields) => {
@@ -100,7 +124,7 @@ client.on('ready', () => {
       })
   })
   
-  app.listen(port, () => console.log(`Example app listening at http://localhost:${port}`))
+  app.listen(secureData.port, () => console.log(`Example app listening at http://${secureData.url}:${secureData.port}`))
 })
 
 client.on('message', async msg => {
@@ -110,32 +134,32 @@ client.on('message', async msg => {
   // Responses to DMs
   if (msg.channel.type === 'dm') {
     try {
-      const guildObj = client.guilds.cache.find(g => g.id === secureData.guildID)
-      if (!guildObj) throw new Error("Bad fetch: guild not found")
-      const verifiedRole = guildObj.roles.cache.find(id => id.name === "Verified")
-      const author = guildObj.members.cache.find(m => m.id === msg.author.id)
-
+      const guild = await client.guilds.resolve(secureData.guildID, true)
+      // console.log("guildObj:", guildObj)
+      if (!!guild !== true) throw new Error("Bad fetch: guild not found")
+      const verifiedRole = guild.roles.cache.find(id => id.name === "Verified")
+      if (!!verifiedRole !== true) throw new Error("Bad fetch: verified role not found")
+      const author = await guild.members.fetch(msg.author)
+      // .cache.find(m => m.id === msg.author.id)
+      if (!!author !== true) {
+        console.log(guild.members, author)
+        throw new Error(`Bad fetch: author not found. dm_id: ${msg.author.id}`)
+      }
+      const isVerified = author.roles.cache.has(verifiedRole.id)
       // verifying UNSW id validity
       const zID = RegExp('((z)([0-9]{6}))')
-      if (!author.roles.cache.has(verifiedRole.id)) {
+      if (!isVerified) { 
         if (zID.test(msg.content)) {
           try {
-            let transporter = nodemailer.createTransport({
-              host: secureData.host,
-              port: secureData.port,
-              secure: true,
-              auth: {
-                user: secureData.user, 
-                pass: secureData.pass, 
-              }
-            })
+            getGmailAccess()
+            let transporter = nodemailer.createTransport(MAIL_AUTH)
             
             let code = sha1(author.id + uuidv4())
             try {
               await queryDB(`DELETE FROM verification WHERE user='${author.id}'`)
-              await queryDB(`INSERT INTO verification (user, code, guild) VALUES('${author.id}', '${code}', '${guildObj.id}')`)  
+              await queryDB(`INSERT INTO verification (user, code, guild) VALUES('${author.id}', '${code}', '${guild.id}')`)  
 
-              let link = `${url}/verify/${code}`
+              let link = `${secureData.url}/verify/${code}`
 
               let info = await transporter.sendMail({
                 from: `UNSW Investment Society`, // sender address
@@ -160,6 +184,7 @@ client.on('message', async msg => {
       }
     } catch (error) {
       console.error(error)
+      msg.author.send(`Sorry, but there's an error :( Please ping @admin on the server for help!`)
     }
     // non-DM msgs
   } else {
