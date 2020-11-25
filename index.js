@@ -140,15 +140,16 @@ client.on('message', async msg => {
       const verifiedRole = guild.roles.cache.find(id => id.name === "Verified")
       if (!!verifiedRole !== true) throw new Error("Bad fetch: verified role not found")
       const author = await guild.members.fetch(msg.author)
-      // .cache.find(m => m.id === msg.author.id)
       if (!!author !== true) {
         console.log(guild.members, author)
         throw new Error(`Bad fetch: author not found. dm_id: ${msg.author.id}`)
       }
-      const isVerified = author.roles.cache.has(verifiedRole.id)
+      const isVerified = author.roles.cache.has(verifiedRole)
+      console.log(isVerified)
+      // author.roles.holds(verifiedRole.id)
       // verifying UNSW id validity
       const zID = RegExp('((z)([0-9]{6}))')
-      if (!isVerified) { 
+      if (!isVerified) {
         if (zID.test(msg.content)) {
           try {
             getGmailAccess()
@@ -181,6 +182,8 @@ client.on('message', async msg => {
         } else {
           await msg.reply(`Please type in a valid zID (format: zXXXXXXX)!`)
         }
+      } else {
+        await msg.author.send(`You have already been verified!`)
       }
     } catch (error) {
       console.error(error)
