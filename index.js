@@ -144,12 +144,13 @@ client.on('message', async msg => {
         console.log(guild.members, author)
         throw new Error(`Bad fetch: author not found. dm_id: ${msg.author.id}`)
       }
-      const isVerified = author.roles.cache.has(verifiedRole)
+
+      const isVerified = author.roles.cache.has(verifiedRole.id)
       console.log(isVerified)
       // author.roles.holds(verifiedRole.id)
       // verifying UNSW id validity
       const zID = RegExp('((z)([0-9]{6}))')
-      if (!isVerified) {
+      if (!!isVerified == false) {
         if (zID.test(msg.content)) {
           try {
             getGmailAccess()
