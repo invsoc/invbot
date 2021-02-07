@@ -22,7 +22,7 @@ const secureData = (fs.existsSync(`./token.json`)) ? require('./token.json') : {
   "url": process.env.URL,
 }
 
-secureData.port = process.env.PORT || 80
+secureData.port = process.env.PORT || 3000
 secureData.url = secureData.URL || `localhost`
 
 const connection = mysql.createPool(process.env.CLEARDB_DATABASE_URL || {
@@ -161,7 +161,7 @@ client.on('message', async msg => {
               await queryDB(`DELETE FROM verification WHERE user='${author.id}'`)
               await queryDB(`INSERT INTO verification (user, code, guild) VALUES('${author.id}', '${code}', '${guild.id}')`)  
 
-              let link = `${secureData.url}/verify/${code}`
+              let link = `http://${secureData.url}:3000/verify/${code}`
 
               let info = await transporter.sendMail({
                 from: `UNSW Investment Society`, // sender address
